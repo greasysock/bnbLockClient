@@ -2,4 +2,4 @@ from support import zwayapi
 
 zway = zwayapi.Connect(0)
 
-zway.put_code(9999)
+zway.get_code(1)
