@@ -2,4 +2,4 @@ from support import zwayapi
 
 zway = zwayapi.Connect(0)
 
-zway.get_zway_namespaces()
+zway.put_code(4444)

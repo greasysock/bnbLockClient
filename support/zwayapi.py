@@ -3,18 +3,14 @@ import requests
 class Connect():
     def __init__(self, device_id):
         self.__device_id = device_id
-        self.__site = 'http://127.0.0.1:8083/ZAutomation/api/v1/'
+        self.__site = 'http://127.0.0.1:8083/ZWaveAPI/'
     def __url_build(self, url):
         return self.__site + url
-    def get_locations(self):
-        site = self.__url_build('locations')
-        r = requests.get(site)
-        print(r.json())
     def get_status(self):
         site = self.__url_build('status')
         r = requests.get(site)
         print(r.json())
-    def get_zway_namespaces(self):
-        site = self.__url_build('namespaces/zways')
-        r = requests.get(site)
+    def put_code(self, user_code):
+        site = self.__url_build('Run/devices[2].instances[0].commandClasses[99].Set(1,{},1)'.format(user_code))
+        r = requests.put(site)
         print(r.json())
