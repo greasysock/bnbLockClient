@@ -20,3 +20,6 @@ class Connect():
         r = requests.put(site, auth=self.__auth)
         print(r.status_code)
         print(r.json())
+    def get_code(self, user_id):
+        site = self.__url_build('Run/devices[2].instances[0].commandClasses[99].Get({})'.format(user_id))
+        r = requests.get(site, auth=self.__auth)
