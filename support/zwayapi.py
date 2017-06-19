@@ -13,4 +13,5 @@ class Connect():
     def put_code(self, user_code):
         site = self.__url_build('Run/devices[2].instances[0].commandClasses[99].Set(1,{},1)'.format(user_code))
         r = requests.put(site)
+        print(r.status_code)
         print(r.json())
