@@ -10,3 +10,7 @@ class Connect():
         site = self.__url_build('locations')
         r = requests.get(site)
         print(r.json())
+    def get_status(self):
+        site = self.__url_build('status')
+        r = requests.get(site)
+        print(r.json())
