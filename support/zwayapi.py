@@ -14,3 +14,7 @@ class Connect():
         site = self.__url_build('status')
         r = requests.get(site)
         print(r.json())
+    def get_zway_namespaces(self):
+        site = self.__url_build('zways')
+        r = requests.get(site)
+        print(r.json())
