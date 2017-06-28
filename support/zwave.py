@@ -8,7 +8,7 @@ from openzwave.option import ZWaveOption
 import time, sys, os, resource
 
 device = "/dev/ttyAMA0"
-options = ZWaveOption(device, config_path="/home/pi/git/open-zwave/config", user_path=".", cmd_line="")
+options = ZWaveOption(device, config_path="config", user_path=".", cmd_line="")
 network = ZWaveNetwork(options, log=None)
 time_started = 0
 
