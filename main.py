@@ -1,5 +1,7 @@
-from support import zwayapi
+from support import zwave, zwavelisten, lockdb
 
-zway = zwayapi.Connect(0)
+default_lockdb = 'access.db'
+mqtt_address = '192.168.1.9'
 
-zway.get_code(-1)
+if __name__ == "__main__":
+    print('')
