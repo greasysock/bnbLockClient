@@ -23,6 +23,7 @@ class service(threading.Thread):
         self.__device = device
         self.__config_path = config_path
         self.__options = ZWaveOption(device, config_path=self.__config_path)
+        self.__options.set_console_output(False)
         self.__options.lock()
         self.__network = None
         self.__network_ready = False

@@ -15,7 +15,7 @@ class lockstates(Enum):
 methods = {
     DEVICES.LOCKS : {
         "Unknown: type=0004, id=aa00" : zwavelocks.YALE,
-        "" : zwavelocks.SCHLAGE
+        "BE469 Touchscreen Deadbolt" : zwavelocks.SCHLAGE
     }
 }
 
