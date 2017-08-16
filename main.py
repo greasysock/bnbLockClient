@@ -1,12 +1,12 @@
 from support import zwave, zwavelisten, lockdb, mqttclient, passwordgen, hashing_passwords
 from support.devices import lock, setget, dbconnector
 from support.info import devices as info_devices
-import time, sys, json
+import time, sys, json, os
 from enum import Enum
 from queue import Queue
 
 
-from support import scheduler
+from support import scheduler, config
 default_lockdb = 'access.db'
 mqtt_address = 'auth.bnbwithme.com'
 mqtt_port = 8883
@@ -18,6 +18,7 @@ ZWAVE_LOCK_TIME = 5
 
 node_registration = 'register/node'
 node_registration_status = 'register/@status'
+
 
 class server_endpoints(Enum):
     nodes_get_registered = 'nodes/{}/get/registered'
@@ -35,7 +36,10 @@ class client_endpoints():
 node_username = 'jAePl0sASz4DHfJsI8XSp1MAWcAaOBUAg5tsEW6GvZ1S7yC7VLdmRm7GdSadPoZGGsSr7SORe1TxAYUVii1bCLW2vXpU4Ogqpzco'
 node_password = '0ADzFznzovDTzWGiOdVLHN0f8luJqHDPOEaL2qKEoCIiTdPCPyv4btcVDz9V509DrSF3s3hA7TwQWQhOwrG5qvZEW0yxEPDtCssa'
 
-def setup_node():
+
+
+
+def setup_node(conf=None):
     auth_client = mqtt_network_startup(username_m=node_username, password_m=node_password)
     lockdb.createdb(default_lockdb)
     password = passwordgen.random_len(150)
@@ -132,7 +136,7 @@ def get_register_details(details):
 
 
 
-def main_loop():
+def main_loop(conf=None):
 
     endpoints = client_endpoints(authdb.node_parent, authdb.node_username)
 
@@ -143,8 +147,10 @@ def main_loop():
 
     def status():
         return 1
-
-    zw = zwave.service()
+    if conf == None:
+        zw = zwave.service()
+    else:
+        zw = zwave.service(device=conf['device_path'])
     zw.start()
 
     deviceids = authdb.get_deivceids()
@@ -227,6 +233,7 @@ def main_loop():
         q.task_done()
 
 if __name__ == "__main__":
+    conf = config.conf
     db_present = lockdb.testdb(default_lockdb)
     if not db_present:
         setup_node()

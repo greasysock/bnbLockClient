@@ -1,6 +1,6 @@
 import sys, argparse, os, random, json, threading, time
 import paho.mqtt.client as mqtt
-from support import __author__, __version__, __title__, lockdb, hashing_passwords, passwordgen, prompts, zwave
+from support import __author__, __version__, __title__, lockdb, hashing_passwords, passwordgen, prompts, zwave, config
 
 default_lockdb = 'access.db'
 mqtt_address = '192.168.1.9'
@@ -59,9 +59,12 @@ class incomingHandle(threading.Thread):
 
 
 
-def device_setup():
+def device_setup(conf=None):
     print("Starting ZWave Network!")
-    zw = zwave.service()
+    if conf == None:
+        zw = zwave.service()
+    else:
+        zw = zwave.service(device=conf['device_path'])
     zw.start()
     for x in range(default_timeout):
         if zw.get_ready():
@@ -142,7 +145,7 @@ def main():
     if args.new:
         db_present = lockdb.testdb(default_lockdb)
         if db_present:
-            device_setup()
+            device_setup(conf=config.conf)
         else:
             print("  ERROR: LockDB is not present.")
 
