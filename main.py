@@ -270,4 +270,4 @@ if __name__ == "__main__":
         elif authdb.node_parent == '' and authdb.node_name == '' and registered:
             get_register_details(registered)
         elif authdb.node_parent and authdb.node_name and registered:
-            main_loop()
+            main_loop(conf=conf)
