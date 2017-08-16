@@ -73,8 +73,8 @@ def setup_node():
         auth_client.stop()
         sys.exit(0)
 
-def mqtt_network_startup(username_m=authdb.node_username, password_m=authdb.node_password):
-    auth_client = mqttclient.Connect(username, password, mqtt_address, port=mqtt_port)
+def mqtt_network_startup(username_m, password_m):
+    auth_client = mqttclient.Connect(username_m, password_m, mqtt_address, port=mqtt_port)
     for x in range(default_timeout):
         if auth_client.get_rc() == 0:
             print("Connected to MQTT Network!")
@@ -232,7 +232,7 @@ if __name__ == "__main__":
         setup_node()
     if db_present:
         authdb = lockdb.database(default_lockdb)
-        bnbhomeclient = mqtt_network_startup()
+        bnbhomeclient = mqtt_network_startup(authdb.node_username, authdb.node_password)
         bnbhomeclient.incoming.set_address_store(server_endpoints.nodes_set_registered.value.format(authdb.node_username))
 
         bnbhomeclient.outgoing.broadcast_message(server_endpoints.nodes_get_registered.value.format(authdb.node_username), message=1)
