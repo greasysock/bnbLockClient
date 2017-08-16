@@ -36,7 +36,7 @@ node_username = 'jAePl0sASz4DHfJsI8XSp1MAWcAaOBUAg5tsEW6GvZ1S7yC7VLdmRm7GdSadPoZ
 node_password = '0ADzFznzovDTzWGiOdVLHN0f8luJqHDPOEaL2qKEoCIiTdPCPyv4btcVDz9V509DrSF3s3hA7TwQWQhOwrG5qvZEW0yxEPDtCssa'
 
 def setup_node():
-    auth_client = mqtt_network_startup()
+    auth_client = mqtt_network_startup(username_m=node_username, password_m=node_password)
     lockdb.createdb(default_lockdb)
     password = passwordgen.random_len(150)
     hash_password = hashing_passwords.make_hash(password)
@@ -73,8 +73,8 @@ def setup_node():
         auth_client.stop()
         sys.exit(0)
 
-def mqtt_network_startup():
-    auth_client = mqttclient.Connect(authdb.node_username, authdb.node_password, mqtt_address, port=mqtt_port)
+def mqtt_network_startup(username_m=authdb.node_username, password_m=authdb.node_password):
+    auth_client = mqttclient.Connect(username, password, mqtt_address, port=mqtt_port)
     for x in range(default_timeout):
         if auth_client.get_rc() == 0:
             print("Connected to MQTT Network!")
