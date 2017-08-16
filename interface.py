@@ -57,88 +57,7 @@ class incomingHandle(threading.Thread):
         self.__client.disconnect()
         self.__client.loop_stop(force=True)
 
-def node_setup_prompt():
-    node_name =             input("  Node Name  (Example: The Gresocks): ")
-    node_location_num = int(input("  House number       (Example: 1133): "))
-    node_location_st =      input("  Street name (Example: Davis Drive): ")
-    node_location_city =    input("  City               (Example: Apex): ")
-    node_location_zip =     input("  Zip code          (Example: 27523): ")
-    node_return = passwordgen.random_len(9, set = 2)
-    node_password = passwordgen.random_len(250)
-    return json.dumps({'Type' : 'node',
-                       'Return' : node_return,
-            'Name' : node_name,
-            'Location' : {
-                'street' : node_location_st,
-                'number' : node_location_num,
-                'city' : node_location_city,
-                'zip' : node_location_zip
-            },
-            'Password' : hashing_passwords.make_hash(node_password)}), node_password, node_return
 
-def node_setup():
-    print("Login to bnbLock")
-    username = prompts.get_username()
-    password = prompts.get_password()
-    response = incomingHandle(username, password)
-    response.start()
-    for count in range(default_timeout):
-        if response.get_connection() == 0:
-            print("**Connected to MQTT Network!")
-            break
-        print("...")
-        time.sleep(1)
-    if response.get_connection() != 0:
-        print("  \nERROR: Could not connect to MQTT Netowrk!")
-        if response.get_connection() == 5:
-            print("    REASON: Incorrect Login")
-        elif response.get_connection() == 3:
-            print("    REASON: Connection Could not be Established")
-        response.quit()
-        sys.exit(0)
-    for count in range(default_timeout):
-        if response.get_registration_server_status() == 1:
-            print("**Connected to bnbLock Network!")
-            break
-        print("...")
-        time.sleep(1)
-    if response.get_registration_server_status() != 1:
-        print("\n  ERROR: Could not connect to bnbLock!\n")
-        response.quit()
-        sys.exit(0)
-    print("\nbnbLock Node Details\n-------------------")
-    registration_details, node_password, node_return = node_setup_prompt()
-    response.publish_node(registration_details, node_return)
-
-    for count in range(default_timeout):
-        if response.response() != None:
-            print("**Response from bnbLock!")
-            break
-        print("...")
-        time.sleep(1)
-    if response.response() == None:
-        print("\n  ERROR: No response from bnbLock!\n")
-        response.quit()
-        sys.exit(0)
-    else:
-        response.quit()
-    account_details = json.loads(response.response().decode('ascii'))
-    if account_details['status'] == 'success':
-        print("bnbLock Node Added to Network!")
-        nodeid = account_details['nodeid']
-        accessdb = lockdb.database(default_lockdb)
-        dec_reg = json.loads(registration_details)
-        accessdb.set_nodeinfo(nodeid=nodeid,
-                              nodepassword=node_password,
-                              username=username,
-                              nodename=dec_reg['Name'])
-        accessdb.set_nodelocation(streetnumber=dec_reg['Location']['number'],
-                                  street=dec_reg['Location']['street'],
-                                  zip=dec_reg['Location']['zip'],
-                                  city=dec_reg['Location']['city'])
-        print("Node Setup Successfully!")
-        accessdb.save()
-        accessdb.close()
 
 def device_setup():
     print("Starting ZWave Network!")
@@ -220,15 +139,6 @@ def main():
     parser.add_argument('-r', '--run', help='Runs mqtt network daemon.', action='store_true',
                         required=False)
     args = parser.parse_args()
-
-    if args.setup:
-        db_present = lockdb.testdb(default_lockdb)
-        if db_present:
-            print('LockDB is already present. Delete current DB to create a new one.')
-        elif not db_present:
-            lockdb.createdb(default_lockdb)
-            print('Node Configuration Wizard\n-------------------------\n')
-            node_setup()
     if args.new:
         db_present = lockdb.testdb(default_lockdb)
         if db_present:

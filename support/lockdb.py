@@ -3,8 +3,7 @@ from support import passwordgen
 
 tables = [("nodeinfo", "'nodeid' name, 'nodepassword' name, 'username' name, 'nodename' name"),
           ("deviceinfo", "'name' name, 'location' name, 'type' name, 'deviceid' name"),
-          ("devicedata", "'deviceid' name, 'type' int, 'date' date,'dataid' name ,'data' text"),
-          ("nodelocation", "'streetnumber' name, 'street' name, 'zip' name, 'city' name")]
+          ("devicedata", "'deviceid' name, 'type' int, 'date' date,'dataid' name ,'data' text")]
 
 def get_tables():
     out_list = list()
@@ -131,9 +130,14 @@ class database():
         command = "INSERT INTO nodeinfo VALUES ('{}', '{}', '{}', '{}')"
         self.__c.execute(command.format(kwargs['nodeid'],
                                         kwargs['nodepassword'],
-                                        kwargs['username'],
-                                        kwargs['nodename']))
+                                        '',
+                                        ''))
+        self.save()
         return -1
+    def set_noderegistration(self, **kwargs):
+        command = "UPDATE nodeinfo SET username = '{}', nodename = '{}'".format(kwargs['username'], kwargs['nodename'])
+        self.__c.execute(command)
+        self.save()
     def get_nodeinfo(self):
         nodeinfo = self.__c.execute("SELECT * FROM nodeinfo")
         for nodeinf in nodeinfo:
@@ -150,14 +154,6 @@ class database():
     @property
     def node_name(self):
         return self.get_nodeinfo()[3]
-
-    def set_nodelocation(self, **kwargs):
-        command = "INSERT INTO nodelocation VALUES ('{}', '{}', '{}', '{}')"
-        self.__c.execute(command.format(kwargs['streetnumber'],
-                                        kwargs['street'],
-                                        kwargs['zip'],
-                                        kwargs['city']))
-        return -1
 
 def testdb(filename):
     testdb = database(filename)

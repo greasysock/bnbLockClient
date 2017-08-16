@@ -1,6 +1,6 @@
 import paho.mqtt.client as mqtt
 import json, threading, time
-import ssl
+import ssl, sys
 
 
 
@@ -23,13 +23,19 @@ class Connect():
         self.__port = port
         self.__client = mqtt.Client("bnbLock{}".format(username))
         self.__client.username_pw_set(self.__username, self.__password)
+        self.__rc = -1
         self.connect()
         self.incoming = self.incoming(self.__client)
         self.incoming.start()
         self.outgoing = self.outgoing(self.__client)
         self.outgoing.start()
     def __on_connect(self, client, userdat, flags, rc):
-        return -1
+        self.__rc = rc
+    def get_rc(self):
+        return self.__rc
+    def stop(self):
+        self.__client.disconnect()
+        sys.exit(0)
     def connect(self):
         self.__client.on_connect = self.__on_connect
         self.__client.tls_set(**tls)
@@ -67,6 +73,8 @@ class Connect():
                 raise(FreqException("Frequency Too Low", 1))
             self.__frequency = new_freq
         def broadcast_message(self, topic, message, qos=1):
+            print(topic)
+            print(message)
             self.__client.publish(topic, payload = message, qos=qos)
         def broadcast(self):
             for broadcast in self.__broadcasts:
@@ -86,9 +94,23 @@ class Connect():
             self.__client = client
             self.__client.on_message = self.__on_message
             self.__callbacks = list()
+            self.__address_stores = dict()
+            self.__last_in = (None, None)
         def run(self):
             self.__client.loop_forever()
+        def get_last_in(self):
+            return self.__last_in
         def __on_message(self, client, userdata, msg):
+            self.__last_in = (userdata, msg)
+            address_stores = dict(self.__address_stores)
+            for address_store in address_stores:
+                if msg.topic == address_store:
+                    self.__address_stores[address_store] = (
+                        msg,
+                        userdata,
+                        time.time()
+                    )
+                    break
             for callback in self.__callbacks:
                 if callback[0] == msg.topic:
                     try:
@@ -120,6 +142,17 @@ class Connect():
                     return False
             else:
                 return False
+        def get_address_store(self, topic):
+            return self.__address_stores[topic]
+        def set_address_store(self, topic):
+            found = False
+            for s_topic in self.__address_stores:
+                if s_topic == topic:
+                    found = True
+            if not found:
+                self.__address_stores[topic] = None
+                self.__client.subscribe(topic)
+
         def set_callback(self, topic, callback, ignore = None):
             if ignore == None:
                 new_callback = ( topic, callback )
@@ -134,4 +167,5 @@ class Connect():
             else:
                 self.__client.subscribe(topic)
                 self.__callbacks.append(new_callback)
+                print(self.__callbacks)
                 return 1
