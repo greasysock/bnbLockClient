@@ -56,6 +56,8 @@ class EventHandle():
         if self.__node_type == DEVICES.LOCKS:
             if self.__node_method == zwavelocks.YALE:
                 self.lock_status = YaleLockEvents(self.__trigger, self.__node)
+            elif self.__node_method == zwavelocks.SCHLAGE:
+                self.lock_status = SchlageLockEvents(self.__trigger, self.__node)
             self.__events.append(self.lock_status)
     def process(self, eventdict):
         for eventtype in self.__events:
@@ -94,7 +96,6 @@ class LockEvents(DeviceEvents):
         self.__node = node
     @property
     def state(self):
-        print(self.__status, self.__lockstate, self.__user)
         return self.__status, self.__lockstate, self.__user
     @state.setter
     def state(self, data):
@@ -135,8 +136,7 @@ class YaleLockEvents(LockEvents):
 
 
         if cc == 'COMMAND_CLASS_ALARM' and int(value) in self.lock_state.keys():
-            print(cc)
-            print(value)
+
             lockstatus = self.lock_state[int(value)]
             self.state = (lockstatus[0], lockstatus[1], 0)
             self.trigger("locks/{}/get/lockstate".format(self.node.name))
@@ -146,6 +146,38 @@ class YaleLockEvents(LockEvents):
         elif cc == 'COMMAND_CLASS_USER_CODE':
             event = (int(index), value.split('\x00')[0])
             print(event)
+            self.append_user_code_event(event)
+        if index > 0:
+            last_message = eventdict
+        return -1
+
+class SchlageLockEvents(LockEvents):
+    lock_state = {
+        19: (False, lockstates.KEYPAD),
+        22: (False, lockstates.LOCAL),
+        25: (False, lockstates.REMOTE),
+        21: (True, lockstates.LOCAL),
+        27: (True, lockstates.AUTO),
+        24: (True, lockstates.REMOTE)
+    }
+    __last_message = None
+    def process(self, eventdict):
+        valueId = eventdict['valueId']
+        cc = valueId['commandClass']
+        value = str(valueId['value'])
+        index = valueId['index']
+
+
+        if cc == 'COMMAND_CLASS_ALARM' and int(value) in self.lock_state.keys():
+
+            lockstatus = self.lock_state[int(value)]
+            self.state = (lockstatus[0], lockstatus[1], 0)
+            self.trigger("locks/{}/get/lockstate".format(self.node.name))
+        elif cc == 'COMMAND_CLASS_BATTERY':
+            self.battery_level = int(value)
+            self.trigger("locks/{}/get/battery".format(self.node.name))
+        elif cc == 'COMMAND_CLASS_USER_CODE':
+            event = (int(index), value.split('\x00')[0])
             self.append_user_code_event(event)
         if index > 0:
             last_message = eventdict

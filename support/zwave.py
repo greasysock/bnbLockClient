@@ -91,10 +91,10 @@ class service(threading.Thread):
     def listen_for_events(self, node, trigger=None):
         event_object = zwavelisten.EventHandle(node, trigger)
         try:
-            self.__event_listen.append(event_object)
+            self.__event_listen[node.node_id] = event_object
         except:
-            self.__event_listen = list()
-            self.__event_listen.append(event_object)
+            self.__event_listen = dict()
+            self.__event_listen[node.node_id] = event_object
         return event_object
     def on_value_change(self, args):
         valueId = args['valueId']
@@ -105,6 +105,4 @@ class service(threading.Thread):
         cc = valueId['commandClass']
         print("{}: {} - {} - ID: {} - IDX: {}".format(label, value, cc, v_id, index))
         if self.__event_listen != None:
-            for node_events in self.__event_listen:
-                if args['nodeId'] == node_events.node_id:
-                    node_events.process(args)
+            self.__event_listen[int(args['nodeId'])].process(args)
