@@ -9,7 +9,7 @@ DEFAULT_CHANGE_TIMEOUT = 4
 
 class device():
     def __init__(self, deviceid, zwavenode, setget, lockevent, dbconnector, scheduler):
-        print('helloworld')
+        print('hello world')
         self.__scheduler = scheduler
         self.__lockevent = lockevent
         self.__deviceid = deviceid
