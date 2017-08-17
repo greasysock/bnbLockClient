@@ -101,6 +101,7 @@ class Connect():
         def get_last_in(self):
             return self.__last_in
         def __on_message(self, client, userdata, msg):
+            print(msg.payload)
             self.__last_in = (userdata, msg)
             address_stores = dict(self.__address_stores)
             for address_store in address_stores:
@@ -167,5 +168,4 @@ class Connect():
             else:
                 self.__client.subscribe(topic)
                 self.__callbacks.append(new_callback)
-                print(self.__callbacks)
                 return 1

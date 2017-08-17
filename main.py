@@ -136,7 +136,7 @@ def get_register_details(details):
 
 
 
-def main_loop(conf=None):
+def main_loop(bnbhomeclient, conf=None):
 
     endpoints = client_endpoints(authdb.node_parent, authdb.node_username)
 
@@ -209,12 +209,12 @@ def main_loop(conf=None):
     zwave_locks = zwave_startup()
 
     # DEVICE INIT
-
+    devices = list()
     for lock_z in zwave_locks:
         sg_object = setget.helper(setget.DEVICES.lock, lock_z.name, device_callback, device_broadcast, device_publisher)
         db_connector = dbconnector.con_select(lock_z.name, authdb, dbconnector.datatypes.lock, q)
         lock_listen = zw.listen_for_events(lock_z, trigger=device_unique_publisher)
-        lock.device(lock_z.name, lock_z, sg_object, lock_listen, db_connector, schedul)
+        devices.append(lock.device(lock_z.name, lock_z, sg_object, lock_listen, db_connector, schedul))
 
     # CONF INIT
 
@@ -270,4 +270,4 @@ if __name__ == "__main__":
         elif authdb.node_parent == '' and authdb.node_name == '' and registered:
             get_register_details(registered)
         elif authdb.node_parent and authdb.node_name and registered:
-            main_loop(conf=conf)
+            main_loop(bnbhomeclient,conf=conf)
