@@ -160,6 +160,7 @@ class device():
         for broadcast in self.__set_get_conf[type.broadcast]:
             self.__setget.set_broadcast(broadcast[1], broadcast[0])
         for callback in self.__set_get_conf[type.callback]:
+            print(callback)
             self.__setget.set_callback(callback[1], callback[0])
     def __configure_schedule(self):
         temp_access_codes = self.__db.get_access_codes_temp()
