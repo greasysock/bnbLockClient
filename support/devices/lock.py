@@ -1,29 +1,176 @@
 from support.devices.settype import type
 import json, time
 from support import passwordgen
-
+from support.devices.control import controller, types
+from support.devices import dbconnector
 #testing
 #from support.devices import dbconnector as testdb
 
 DEFAULT_CHANGE_TIMEOUT = 4
 
+DEFAULT_PERM_ACCESS_CODE_LIST = [1,2,3,4]
+
+class perm_access_code():
+    def __init__(self, idx, zw, db, lock_list):
+        self._last_action = 0
+
+        self._idx = idx
+        self._code = None
+        self._zw = zw
+        self._lock_listen = lock_list
+        self._db = db
+        self._code_topic = 'access_codes/perm/{}'.format(idx)
+        self._status = self._get_status()
+        self._code_init()
+
+    def _get_status(self):
+        access_code = self._db.get_access_code_perm(self.idx)
+        if access_code:
+            self._code = access_code['code']
+            self._last_action = access_code['date']
+            return access_code['status']
+        else:
+            return 0
+    def _code_init(self):
+        if self._status == 1:
+            code_status = self._add_code()
+            if code_status:
+                self._status = 2
+                self._last_action = int(time.time())
+                self._update_code()
+            elif not code_status:
+                self.__status = -2
+            pass
+
+    def _add_code(self):
+        values = self._zw.get_values(class_id=0x63, type='Raw')
+        for value in values:
+            if values[value].index == self.idx:
+                values[value].data = chr(0x00) * 7
+                time.sleep(1)
+                values[value].data = chr(0x01) + str(self._code)
+                values[value].refresh()
+                found = False
+                for x in range(DEFAULT_CHANGE_TIMEOUT):
+                    code_events = self._lock_listen.lock_status.get_user_code_event()
+                    print('lock.py {}'.format(code_events))
+                    for code in code_events:
+                        if str(code[0]) == str(self._idx):
+                            found = True
+                            break
+                        if found:
+                            print('code event found')
+                            break
+                    time.sleep(1)
+                return found
+        return False
+
+    def _update_code(self):
+        perm_code_dict = {
+            'status': self._status,
+            'code': self._code,
+            'index': self.idx,
+            'date': self._last_action
+        }
+        status = self._db.set_access_code_perm(perm_code_dict)
+        if not status:
+            self._status = -1
+    @property
+    def topic(self):
+        return self._code_topic
+
+    @property
+    def idx(self):
+        return self._idx
+
+    def _code_check(self, potential_code):
+        return True
+
+    @property
+    def code(self):
+        return self._code
+
+    def _code_cleaner(self, code):
+        out_string = ''
+        for char in code:
+            ascii_char = ord(char)
+            if 47 <= ascii_char <= 57:
+                out_string += char
+        return out_string
+
+    @code.setter
+    def code(self, value):
+        clean_code = self._code_cleaner(value)
+        if self._code_check(clean_code):
+            self._code = clean_code
+            perm_code_dict = {
+                'status' : 1,
+                'code' : self._code,
+                'index' : self.idx,
+                'date' : int(time.time())
+            }
+            self._last_action = int(time.time())
+            status = self._db.set_access_code_perm(perm_code_dict)
+            if status:
+                self._status = 1
+                add_status = self._add_code()
+                if add_status:
+                    self._status = 2
+                    self._update_code()
+                else:
+                    self._status = -2
+            elif not status:
+                self._status = -1
+    def remove_code(self):
+        return True
+
+    def set(self, client, userdata, msg):
+        raw_message = msg.payload.decode('ascii')
+        self.code = raw_message
+
+    def get(self):
+        return {
+            'status' : self._status,
+            'last_action' : self._last_action
+        }
+
 class device():
-    def __init__(self, deviceid, zwavenode, setget, lockevent, dbconnector, scheduler):
-        print('hello world')
+    def __init__(self, zwavenode, setget, lockevent, dbconnector, scheduler, device_controller):
         self.__scheduler = scheduler
-        self.__lockevent = lockevent
-        self.__deviceid = deviceid
+
+        #Device Controller Configuration
+        self._controller = device_controller
+        self.__db = dbconnector
         self.__zw = zwavenode
+        self.__lockevent = lockevent
+
+        self._device_controls = [ types.type_binary('lockstate', 'Door Control',
+                                                   get_endpoint=self.get_lockstate,
+                                                    set_endpoint=self.set_lockstate,
+                                                    high_name="Lock",
+                                                    low_name="Unlock"),
+                                 ]
+
+        for access_code in DEFAULT_PERM_ACCESS_CODE_LIST:
+            access_code_obj = perm_access_code(access_code, self.__zw, self.__db, self.__lockevent)
+            access_code_controller = types.type_access_code_input(access_code_obj.topic, set_endpoint=access_code_obj.set,
+                                                                  get_endpoint=access_code_obj.get,
+                                                                  query_only=True,
+                                                                  input_name='Access Code {}'.format(access_code_obj.idx))
+            self._device_controls.append(access_code_controller)
+
+        for device_control in self._device_controls:
+            self._controller.append_control(device_control)
+
+        self.__deviceid = self._controller.device_id
         self.__setget = setget
         self.__batterylevel = None
-        self.__db = dbconnector
         self.__set_get_conf = {
             type.broadcast :
-                [ ( self.get_lockstate, "get/lockstate" ),
+                [
                   ( self.get_battery, "get/battery")],
             type.callback  :
-                [ ( self.set_lockstate,             "set/lockstate" ),
-
+                [
                   ( self.set_access_code,           "set/access_code/+" ),
 
                   ( self.set_autolock,              "set/autolock"),
@@ -88,9 +235,7 @@ class device():
         topics = msg.topic.split('/')
         topicslen = topics.__len__()
         if topicslen == 3 and json_message != -1:
-            if topics[2] == 'perm':
-                self.set_access_code_perm(json_message)
-            elif topics[2] == 'temp':
+            if topics[2] == 'temp':
                 self.set_access_code_temp(json_message)
     def set_get_response_code(self, client, userdata, msg):
         raw_message = msg.payload.decode('ascii')
@@ -100,14 +245,10 @@ class device():
             return
         expected_key = ['response']
         if sorted(expected_key) == sorted(json_message.keys()):
-            print("here")
             if self.set_get_response_code_check_return(json_message['response']):
-                print('here')
                 response = self.__db.get_response_code()
                 self.__setget.publish('set/get/response_code/{}'.format(json_message['response']), response)
 
-        print(msg.payload)
-        print('reponse gen')
     def set_get_response_code_check_return(self, code):
         return True
     def set_access_code_temp(self, data):
@@ -129,28 +270,6 @@ class device():
                 if dataid:
                     access_code = self.__db.get_access_code_temp(dataid)
                     self.__access_code_temp_stage_0_schedule_prep(access_code)
-    def set_access_code_perm(self, data):
-        expected_keys = ['index',
-                         'response',
-                         'code']
-        if sorted(expected_keys) == sorted(data.keys()):
-            index = int(data['index'])
-            code = int(data['code'])
-            if 0 <= index <= 4:
-                indexcheck = True
-                print(index)
-            else:
-                indexcheck = False
-            if 4 <= str(code).__len__() <= 10:
-                codecheck = True
-            else:
-                codecheck = False
-            responsecheck = self.__response_check(data['response'])
-            if indexcheck and codecheck and responsecheck:
-                status = self.__db.set_access_code_perm(data)
-                if status and data['index'] != 0:
-                    self.__zw.set_usercode_at_index(int(data['index']), data['code'])
-                    print(self.__zw.get_usercode(int(data['index'])))
     def __response_check(self, response):
         return True
     def __start_end_check(self, start, end):
@@ -161,12 +280,10 @@ class device():
         for broadcast in self.__set_get_conf[type.broadcast]:
             self.__setget.set_broadcast(broadcast[1], broadcast[0])
         for callback in self.__set_get_conf[type.callback]:
-            print(callback)
             self.__setget.set_callback(callback[1], callback[0])
     def __configure_schedule(self):
         temp_access_codes = self.__db.get_access_codes_temp()
         for temp_code in temp_access_codes:
-            print(temp_code)
             if temp_code['stage'] == 0:
                 self.__access_code_temp_stage_0_schedule_prep(temp_code)
             elif temp_code['stage'] == 1:
@@ -202,7 +319,6 @@ class device():
                 potential_code = passwordgen.random_len(int(access_code['length']), set=4)
         access_code['code'] = potential_code
         access_code['stage'] = 1
-        print(access_code)
         self.__db.update_data(dataid, access_code)
         temp_access_codes = self.__db.get_access_codes_temp()
         for temp_code in temp_access_codes:
@@ -210,7 +326,6 @@ class device():
                 try:
                     if temp_code['code'] == potential_code:
                         self.__access_code_temp_stage_1_schedule_prep(temp_code)
-                        print(temp_code)
                         return True
                 except KeyError:
                     return False
@@ -249,7 +364,6 @@ class device():
                     found = False
                     for x in range(DEFAULT_CHANGE_TIMEOUT):
                         code_events = self.__lockevent.lock_status.get_user_code_event()
-                        print(code_events)
                         for code in code_events:
                             if code[0] == potential_idx and code[1] == access_code['code']:
                                 found = True
@@ -281,7 +395,6 @@ class device():
                 found = False
                 for x in range(DEFAULT_CHANGE_TIMEOUT):
                     code_events = self.__lockevent.lock_status.get_user_code_event()
-                    print(code_events)
                     for code in code_events:
                         if code[0] == access_code['index'] and code[1] != access_code['code']:
                             found = True

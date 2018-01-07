@@ -179,6 +179,12 @@ class SchlageLockEvents(LockEvents):
         elif cc == 'COMMAND_CLASS_USER_CODE':
             event = (int(index), value.split('\x00')[0])
             self.append_user_code_event(event)
+        elif cc == 'COMMAND_CLASS_DOOR_LOCK':
+            lock_method = lockstates.REMOTE
+            if value == 'True':
+                self.state = (True, lock_method, 0)
+            elif value == 'False':
+                self.state = (False, lock_method, 0)
         if index > 0:
             last_message = eventdict
         return -1

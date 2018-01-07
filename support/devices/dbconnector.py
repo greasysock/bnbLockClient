@@ -44,8 +44,11 @@ class lockconnection(connection):
         self.__queue = queue
     def __wraper(self, function, *args, **kwargs):
         return_queue = Queue()
-        self.__queue.put((return_queue, function, args, kwargs))
-        results = return_queue.get()
+        try:
+            results = function(*args, **kwargs)
+        except sqlite3.ProgrammingError:
+            self.__queue.put((return_queue, function, args, kwargs))
+            results = return_queue.get()
         return results
     def set_autolock(self, state):
         return -1
@@ -80,8 +83,7 @@ class lockconnection(connection):
         self.__wraper(self.__database.update_devicedata, self.__deviceid,dataid,ascii_d)
     def remove_data(self, dataid):
         self.__wraper(self.__database.remove_devicedata, self.__deviceid, dataid)
-    def get_access_codes_perm(self):
-        return -1
+
     def get_access_codes(self):
         return -1
     def set_access_code_temp(self, data):
@@ -96,8 +98,34 @@ class lockconnection(connection):
         return -1
     def get_response_code(self):
         return -1
+    def get_access_codes_perm(self):
+        try:
+            raw_codes = self.__database.get_devicedata_idx(self.__deviceid, datatypes.lock_access_code_perm.value)
+
+        except sqlite3.ProgrammingError:
+            raw_codes = self.__wraper(self.__database.get_devicedata_idx, self.__deviceid, datatypes.lock_access_code_perm.value)
+
+        out_list = list()
+        for raw_perm in raw_codes:
+            data = asciibase64_to_dict(raw_perm[datatypes.dataidx.value])
+            data['dataid'] = raw_perm[datatypes.dataididx.value]
+            out_list.append(data)
+        return out_list
+
+    def get_access_code_perm(self, idx):
+        perm_access = self.get_access_codes_perm()
+        access_code = None
+        for perm_code in perm_access:
+            if perm_code['index'] == idx:
+                access_code = perm_code
+
+        return access_code
     def set_access_code_perm(self, data):
-        perm_codes = self.__wraper(self.__database.get_devicedata_idx, self.__deviceid, datatypes.lock_access_code_perm.value)
+        try:
+            perm_codes = self.__database.get_devicedata_idx( self.__deviceid, datatypes.lock_access_code_perm.value)
+        except sqlite3.ProgrammingError:
+            perm_codes = self.__wraper(self.__database.get_devicedata_idx, self.__deviceid, datatypes.lock_access_code_perm.value)
+
         print(perm_codes)
         if data['index'] != 0:
             deleted_data = -1
@@ -109,9 +137,15 @@ class lockconnection(connection):
                     deleted_data = device_data[datatypes.dataididx.value]
             if not self.__wraper(self.__database.check_dataid, deleted_data):
                 bson_obj = dict_to_asciibase64(data)
-                data_id = self.__wraper(self.__database.add_devicedata, type=datatypes.lock_access_code_perm.value,
-                                        deviceid=self.__deviceid, date=time.time(), data=bson_obj)
-                return self.__wraper(self.__database.check_dataid, data_id)
+                try:
+                    data_id = self.__database.add_devicedata(type=datatypes.lock_access_code_perm.value,deviceid=self.__deviceid, date=int(time.time()), data=bson_obj)
+                except sqlite3.ProgrammingError:
+                    data_id = self.__wraper(self.__database.add_devicedata, type=datatypes.lock_access_code_perm.value,
+                                        deviceid=self.__deviceid, date=int(time.time()), data=bson_obj)
+                try:
+                    return self.__database.check_dataid(data_id)
+                except sqlite3.ProgrammingError:
+                    return self.__wraper(self.__database.check_dataid, data_id)
         return False
 
 device_tree = {

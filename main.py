@@ -1,5 +1,6 @@
 from support import zwave, zwavelisten, lockdb, mqttclient, passwordgen, hashing_passwords
 from support.devices import lock, setget, dbconnector
+from support.devices.control import controller
 from support.info import devices as info_devices
 import time, sys, json, os
 from enum import Enum
@@ -30,7 +31,7 @@ class client_endpoints():
 
     def __init__(self, username, nodeid):
         self.scope = "users/{}/nodes/{}/devices/".format(username, nodeid)
-        self.info_scope = "users/{}/nodes/{}/conf/".format(username, nodeid)
+        self.info_scope = "users/{}/nodes/{}/conf/node/".format(username, nodeid)
 
 
 node_username = 'jAePl0sASz4DHfJsI8XSp1MAWcAaOBUAg5tsEW6GvZ1S7yC7VLdmRm7GdSadPoZGGsSr7SORe1TxAYUVii1bCLW2vXpU4Ogqpzco'
@@ -171,22 +172,6 @@ def main_loop(bnbhomeclient, conf=None):
         full_topic = endpoints.scope + topic
         bnbhomeclient.outgoing.broadcast_message(full_topic, message)
 
-    def info_callback(topic, callback):
-        scope_len = endpoints.info_scope.__len__()
-        full_topic = endpoints.info_scope + topic
-        bnbhomeclient.incoming.set_callback(full_topic, callback, ignore=scope_len)
-
-    def info_broadcast(topic, emitter):
-        full_topic = endpoints.info_scope + topic
-        bnbhomeclient.outgoing.set_broadcast(full_topic, emitter, unique_id=topic)
-
-    def info_unique_publisher(unique_id):
-        bnbhomeclient.outgoing.broadcast_unique(unique_id)
-
-    def info_publisher(topic, message, qos=1):
-        full_topic = endpoints.info_scope + topic
-        bnbhomeclient.outgoing.broadcast_message(full_topic, message, qos=qos)
-
     #DEVICE CONFIGURATION/FIND
 
     def zwave_startup():
@@ -210,16 +195,17 @@ def main_loop(bnbhomeclient, conf=None):
 
     # DEVICE INIT
     devices = list()
+    device_controllers = list()
     for lock_z in zwave_locks:
+        device_controller = controller.interface(bnbhomeclient, endpoints.scope, controller.DEVICES.lock, lock_z.name)
         sg_object = setget.helper(setget.DEVICES.lock, lock_z.name, device_callback, device_broadcast, device_publisher)
         db_connector = dbconnector.con_select(lock_z.name, authdb, dbconnector.datatypes.lock, q)
         lock_listen = zw.listen_for_events(lock_z, trigger=device_unique_publisher)
-        devices.append(lock.device(lock_z.name, lock_z, sg_object, lock_listen, db_connector, schedul))
-
+        devices.append(lock.device(lock_z, sg_object, lock_listen, db_connector, schedul, device_controller))
+        device_controllers.append(device_controller)
     # CONF INIT
-
-    info_devices_helper = setget.info_helper(setget.INFO.nodes, info_callback, info_broadcast, info_publisher)
-    info_devices.info(info_devices_helper, authdb, q)
+    info_controller = controller.interface(bnbhomeclient, endpoints.info_scope)
+    info_devices.info(info_controller, authdb, q, device_controllers)
 
     bnbhomeclient.outgoing.frequency = 30
     bnbhomeclient.outgoing.set_broadcast(server_endpoints.nodes_get_status.value.format(authdb.node_username), status, server_endpoints.nodes_get_status.value.format(authdb.node_username))

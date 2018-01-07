@@ -60,6 +60,9 @@ class Connect():
                 if unique_id != None:
                     self.__unique_broadcasts[unique_id] = new_broadcast
                     print(self.__unique_broadcasts)
+        def set_query_broadcast(self, topic, broadcast_call, unique_id):
+            new_broadcast = (topic, broadcast_call)
+            self.__unique_broadcasts[unique_id] = new_broadcast
         @property
         def frequency(self):
             return self.__frequency
