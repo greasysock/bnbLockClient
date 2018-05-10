@@ -20,20 +20,21 @@ ZWAVE_LOCK_TIME = 5
 node_registration = 'register/node'
 node_registration_status = 'register/@status'
 
-
+#Create Enum for endpoints that are on bnbLockServer
 class server_endpoints(Enum):
     nodes_get_registered = 'nodes/{}/get/registered'
     nodes_set_registered = 'nodes/{}/set/registered'
 
     nodes_get_status = 'nodes/{}/get/status'
 
+#Endpoints for client application
 class client_endpoints():
 
     def __init__(self, username, nodeid):
         self.scope = "users/{}/nodes/{}/devices/".format(username, nodeid)
         self.info_scope = "users/{}/nodes/{}/conf/node/".format(username, nodeid)
 
-
+#Default user and pass to create a new user on the bnbLock network
 node_username = 'jAePl0sASz4DHfJsI8XSp1MAWcAaOBUAg5tsEW6GvZ1S7yC7VLdmRm7GdSadPoZGGsSr7SORe1TxAYUVii1bCLW2vXpU4Ogqpzco'
 node_password = '0ADzFznzovDTzWGiOdVLHN0f8luJqHDPOEaL2qKEoCIiTdPCPyv4btcVDz9V509DrSF3s3hA7TwQWQhOwrG5qvZEW0yxEPDtCssa'
 
@@ -42,10 +43,16 @@ node_password = '0ADzFznzovDTzWGiOdVLHN0f8luJqHDPOEaL2qKEoCIiTdPCPyv4btcVDz9V509
 
 def setup_node(conf=None):
     auth_client = mqtt_network_startup(username_m=node_username, password_m=node_password)
+    #Creates a new lockdb file
     lockdb.createdb(default_lockdb)
+    #Generates a random password
     password = passwordgen.random_len(150)
+    #Hashes password
     hash_password = hashing_passwords.make_hash(password)
+    #Creates a random id for the bnbLock Server to return a message on.
     node_return = passwordgen.random_len(9, set=2)
+    
+    #Only sends the hashed password to the node, so the password is never broadcast
     registration_message = {
         'type' : 'node',
         'return' : node_return,
@@ -54,9 +61,13 @@ def setup_node(conf=None):
     return_address = '{}/{}'.format(node_registration, node_return)
     auth_client.incoming.set_address_store(return_address)
     time.sleep(3)
+    
+    #Broadcast registration details to bnbLock Server
     auth_client.outgoing.broadcast_message(node_registration, json.dumps(registration_message))
-
     success = False
+    
+    #Start loop to check for reply from bnbLock Server by registering to return_address
+    #And checking if there are any mesages on that address.
     for x in range(default_timeout):
         if auth_client.incoming.get_address_store(return_address) != None:
             return_values = auth_client.incoming.get_address_store(return_address)
