@@ -58,6 +58,10 @@ def setup_node(conf=None):
         'return' : node_return,
         'password' : hash_password
     }
+    """
+    Detemerine the address on the MQTT netowrk to listen for the return message from the registration server.
+    After we figure out where to listen, we set the MQTT client to listen on that address.
+    """
     return_address = '{}/{}'.format(node_registration, node_return)
     auth_client.incoming.set_address_store(return_address)
     time.sleep(3)
@@ -65,11 +69,14 @@ def setup_node(conf=None):
     #Broadcast registration details to bnbLock Server
     auth_client.outgoing.broadcast_message(node_registration, json.dumps(registration_message))
     success = False
-    
-    #Start loop to check for reply from bnbLock Server by registering to return_address
-    #And checking if there are any mesages on that address.
+    """
+    Start loop to check for reply from bnbLock Server by registering to return_address
+    and checking if there are any mesages on that address.
+    """
     for x in range(default_timeout):
+        #Check if message has been received on that return_address
         if auth_client.incoming.get_address_store(return_address) != None:
+            #If a message was received, check the status of the registration.
             return_values = auth_client.incoming.get_address_store(return_address)
             return_value = json.loads(return_values[0].payload.decode('ascii'))
             if return_value['status'] == 'OKAY':
@@ -82,28 +89,34 @@ def setup_node(conf=None):
         print("  ERROR: Could not connect pre-register to bnbHome Network!")
         auth_client.stop()
         sys.exit(0)
+    #If sucess was changed from a bool into a dictionary, the registration must have been successful.
     if type(success) != type(bool()):
         print('Registration ID: {}'.format(success['nodeid']))
         authdb = lockdb.database(default_lockdb)
         authdb.set_nodeinfo(nodeid=success['nodeid'], nodepassword=password)
         auth_client.stop()
         sys.exit(0)
-
+        
+#This function starts up MQTT client
 def mqtt_network_startup(username_m, password_m):
     auth_client = mqttclient.Connect(username_m, password_m, mqtt_address, port=mqtt_port)
     for x in range(default_timeout):
+        #Check if good connection was made
         if auth_client.get_rc() == 0:
             print("Connected to MQTT Network!")
             break
         time.sleep(2)
         print("...")
     if auth_client.get_rc() != 0:
+        #If a good connection was not made, exit.
         print("  ERROR: Could not connect to MQTT Network!")
         auth_client.stop()
         sys.exit(0)
+    #Check if node is registered on bnbHome network.
     auth_client.incoming.set_address_store(node_registration_status)
     for x in range(default_timeout):
         try:
+            #Registration server will return 1 if node/client is on network.
             if auth_client.incoming.get_address_store(node_registration_status)[0].topic == node_registration_status and \
                             auth_client.incoming.get_address_store(node_registration_status)[0].payload.decode(
                                 'ascii') == '1':
@@ -115,6 +128,7 @@ def mqtt_network_startup(username_m, password_m):
             time.sleep(2)
             print("...")
     try:
+        #Registration server will return -1 if not on network.
         if auth_client.incoming.get_address_store(node_registration_status)[0].payload.decode('ascii') != '1':
             print("  ERROR: Could not connect to bnbHome Network!")
             auth_client.stop()
@@ -130,6 +144,7 @@ def listen_for_message(mqtt_c, topic):
         return mqtt_c.incoming.get_address_store(topic)
     return None
 
+#Self explainatory
 def shutdown():
     sys.exit(0)
 
@@ -141,30 +156,41 @@ def register_node():
     bnbhomeclient.outgoing.frequency = 5
     bnbhomeclient.outgoing.set_broadcast(server_endpoints.nodes_get_status.value.format(authdb.node_username), status, server_endpoints.nodes_get_status.value.format(authdb.node_username))
 
+#Function to help with node registration
 def get_register_details(details):
     registration_details = json.loads(details)
     authdb.set_noderegistration(username=registration_details['username'], nodename=registration_details['nodename'])
     shutdown()
 
 
-
+"""Main looping function
+This loop is composed of 4 threads
+Thread 0: Main thread that handles the sqlite file
+Thread 1: Scheduling thread for events
+Thread 2: Incoming thread for MQTT. Listens for events on network and executes them.
+Thread 3: ZWave thread that listens to events on zwave network and broadcasts events on mqtt network if necessary.
+"""
 def main_loop(bnbhomeclient, conf=None):
-
+    #Generate node endpoints on bnbHome network. Nodes only have access to their own endpoints.
     endpoints = client_endpoints(authdb.node_parent, authdb.node_username)
-
+    #Create a queue on main thread for accessing main thread for writing to slite db from other threads.
     q = Queue()
-
+    
+    #Start a scheduling thread to schedule tasks to be executed.
     schedul = scheduler.mainthread.interface()
     schedul.start()
-
+    
     def status():
         return 1
+    
+    #Check if there is any config file on zwave service
     if conf == None:
         zw = zwave.service()
     else:
         zw = zwave.service(device=conf['device_path'])
     zw.start()
-
+    
+    #Get the ids of devices already registered on node.
     deviceids = authdb.get_deivceids()
 
     def device_callback(topic, callback):
