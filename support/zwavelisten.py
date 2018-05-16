@@ -1,3 +1,8 @@
+"""
+zwavelisten.py is the listener for events on the network. If an even matches certain parameters, they may broadcast on MQTT network
+or saved for later use.
+"""
+
 from enum import Enum
 
 class DEVICES(Enum):
@@ -118,6 +123,8 @@ class LockEvents(DeviceEvents):
         return self.__user_codes
     def process(self, eventdict):
         return -1
+
+# Each different lock has it's own event processor because each lock operates slightly differently.
 class YaleLockEvents(LockEvents):
     lock_state = {
         19 : (False, lockstates.KEYPAD),
@@ -136,7 +143,7 @@ class YaleLockEvents(LockEvents):
 
 
         if cc == 'COMMAND_CLASS_ALARM' and int(value) in self.lock_state.keys():
-
+            # Get lockstate from dictionary and then broadcast using the trigger on MQTT client.
             lockstatus = self.lock_state[int(value)]
             self.state = (lockstatus[0], lockstatus[1], 0)
             self.trigger("locks/{}/get/lockstate".format(self.node.name))

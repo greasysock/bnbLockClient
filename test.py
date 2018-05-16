@@ -1,3 +1,5 @@
+# File was used during testing.
+
 from support import zwave, zwavelisten, lockdb, mqttclient
 from support.devices import lock, setget, dbconnector
 from support.info import devices as info_devices

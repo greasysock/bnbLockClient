@@ -1,3 +1,7 @@
+"""
+zwave.py functions as an interface for the zwave library providing all the necessary functions to manage the network in bnbHome.
+"""
+
 import openzwave
 from openzwave.node import ZWaveNode, ZWaveNodeDoorLock, ZWaveNodeSecurity
 from openzwave.value import ZWaveValue
@@ -9,6 +13,9 @@ from support import zwavelisten
 import time, sys, os, resource, threading, enum
 
 class bnbZWaveNetwork(ZWaveNetwork):
+    """
+    Class that handles events in a more low level way than what the original zwave library uses.
+    """
     def __init__(self, options, log=None, autostart=False, kvals=True):
         ZWaveNetwork.__init__(self, options, log=log, autostart=autostart,kvals=kvals)
     def _handle_value(self, node=None, value=None):
@@ -49,6 +56,8 @@ class service(threading.Thread):
             if self.__network.state >= self.__network.STATE_READY:
                 self.__network_ready = True
                 print(" done in {} seconds".format(time_started))
+
+                # Redirects all messaging events to self.on_value_change
                 self.__network.handle_value_changed = self.on_value_change
                 break
             else:
@@ -105,4 +114,5 @@ class service(threading.Thread):
         cc = valueId['commandClass']
         print("{}: {} - {} - ID: {} - IDX: {}".format(label, value, cc, v_id, index))
         if self.__event_listen != None:
+            # Process event dictionary by sending it off to be interpreted by event processor to determine what to do.
             self.__event_listen[int(args['nodeId'])].process(args)

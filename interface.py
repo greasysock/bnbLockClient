@@ -1,3 +1,5 @@
+# Interface which adds new locks to bnbHome network from zwave network.
+
 import sys, argparse, os, random, json, threading, time
 import paho.mqtt.client as mqtt
 from support import __author__, __version__, __title__, lockdb, hashing_passwords, passwordgen, prompts, zwave, config

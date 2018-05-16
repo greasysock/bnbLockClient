@@ -1,3 +1,8 @@
+"""
+mqttclient.py is the send/receive component of the mqtt network.
+mqttclient.py is responsible for handling incoming messages and sending those messages off to the correct callbacks
+"""
+
 import paho.mqtt.client as mqtt
 import json, threading, time
 import ssl, sys
