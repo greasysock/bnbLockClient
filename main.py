@@ -71,7 +71,7 @@ def setup_node(conf=None):
     success = False
     """
     Start loop to check for reply from bnbLock Server by registering to return_address
-    and checking if there are any mesages on that address.
+    and checking if there are any messages on that address.
     """
     for x in range(default_timeout):
         #Check if message has been received on that return_address
@@ -194,18 +194,42 @@ def main_loop(bnbhomeclient, conf=None):
     deviceids = authdb.get_deivceids()
 
     def device_callback(topic, callback):
+        """
+        Sets callback for device or service on particular topic
+        :param topic: (String) Device or service topic
+        :param callback: (Method) Method to callback onto when topic is broadcast on
+        :return: None, function is used by device/service controller to create new callbacks.
+        """
         scope_len = endpoints.scope.split('/').__len__() + 1
         full_topic = endpoints.scope + topic
         bnbhomeclient.incoming.set_callback(full_topic, callback, ignore=scope_len)
 
     def device_broadcast(topic, emitter):
+        """
+        Broadcasts function that returns a value to particular topic.
+        Example: Method status() returns 1, and this value is emitted onto topic every 60 seconds.
+        :param topic: (String) Device or service topic
+        :param emitter: (Method) Method to call when broadcasting
+        :return: None, function is used by device/service controller to create new callbacks
+        """
         full_topic = endpoints.scope + topic
         bnbhomeclient.outgoing.set_broadcast(full_topic, emitter, unique_id=topic)
 
     def device_unique_publisher(unique_id):
+        """
+        Create broadcast triggers that device can use to trigger broadcast after a certain event.
+        :param unique_id: Id of device
+        :return: None, function is used by device/service controller to create new unique publishing events.
+        """
         bnbhomeclient.outgoing.broadcast_unique(unique_id)
 
     def device_publisher(topic, message):
+        """
+        Allows device/service to uniquely publish a payload onto a particular scope.
+        :param topic: (String)
+        :param message: (String)
+        :return:
+        """
         full_topic = endpoints.scope + topic
         bnbhomeclient.outgoing.broadcast_message(full_topic, message)
 
@@ -223,6 +247,7 @@ def main_loop(bnbhomeclient, conf=None):
             zw.stop()
             shutdown()
 
+        #Create list of zwave locks
         zwave_locks = list()
         for node in zw.get_nodes():
             if zw.get_node_type(node) == ZWAVE_LOCK and node.name in deviceids:
@@ -233,20 +258,27 @@ def main_loop(bnbhomeclient, conf=None):
     # DEVICE INIT
     devices = list()
     device_controllers = list()
+    # Lock device configuration. Uses old and new method for endpoint management.
     for lock_z in zwave_locks:
+        # Create device controller object and define device scope.
         device_controller = controller.interface(bnbhomeclient, endpoints.scope, controller.DEVICES.lock, lock_z.name)
+        # Create set get object to help create set/get endpoints on node scope.
         sg_object = setget.helper(setget.DEVICES.lock, lock_z.name, device_callback, device_broadcast, device_publisher)
+        # Create a db connector object to allow device access to database file from other thread
         db_connector = dbconnector.con_select(lock_z.name, authdb, dbconnector.datatypes.lock, q)
+        # Create listener object for events on zwave network. Allows device to trigger publishing events.
         lock_listen = zw.listen_for_events(lock_z, trigger=device_unique_publisher)
         devices.append(lock.device(lock_z, sg_object, lock_listen, db_connector, schedul, device_controller))
         device_controllers.append(device_controller)
     # CONF INIT
+    # Create info endpoint for configuration and general node info/health
     info_controller = controller.interface(bnbhomeclient, endpoints.info_scope)
     info_devices.info(info_controller, authdb, q, device_controllers)
 
     bnbhomeclient.outgoing.frequency = 30
     bnbhomeclient.outgoing.set_broadcast(server_endpoints.nodes_get_status.value.format(authdb.node_username), status, server_endpoints.nodes_get_status.value.format(authdb.node_username))
 
+    # Keep node running and keep queue open for writing to db file.
     while True:
         # now the main thread doesn't care what function it's executing.
         # previously it assumed it was sending the message to display().
@@ -256,10 +288,21 @@ def main_loop(bnbhomeclient, conf=None):
         q.task_done()
 
 if __name__ == "__main__":
+    """
+    Startup method which checks what status node is in.
+    There are 4 main states node can be in at any time:
+        1. Unregistered, unassigned from user, and no db file present.
+        2. Unregistered, unassigned from user, and db file present.
+        3. Registered, unassigned from user, and db file present.
+        4. Registered, assigned to user, and db file present.
+    this method ensures that node is doing the right thing at all times.
+    """
     conf = config.conf
     db_present = lockdb.testdb(default_lockdb)
+    # If no db is present start new node setup
     if not db_present:
         setup_node()
+    # If node db is present startup network to check it's registration status.
     if db_present:
         authdb = lockdb.database(default_lockdb)
         bnbhomeclient = mqtt_network_startup(authdb.node_username, authdb.node_password)
@@ -283,14 +326,18 @@ if __name__ == "__main__":
             bnbhomeclient.outgoing.broadcast_message(server_endpoints.nodes_get_registered.value.format(authdb.node_username), message=1)
 
             time.sleep(2)
-            get_message = get_message = listen_for_message(bnbhomeclient, server_endpoints.nodes_set_registered.value.format(authdb.node_username))
+            get_message = listen_for_message(bnbhomeclient, server_endpoints.nodes_set_registered.value.format(authdb.node_username))
 
+        # Unhandled case
         if registered == None:
             shutdown()
 
         if authdb.node_parent == '' and authdb.node_name == '' and not registered:
+            # Register node onto network
             register_node()
         elif authdb.node_parent == '' and authdb.node_name == '' and registered:
+            # If node is already registered to an account, get the registration details
             get_register_details(registered)
         elif authdb.node_parent and authdb.node_name and registered:
+            # If registration is intact, run normal loop.
             main_loop(bnbhomeclient,conf=conf)
