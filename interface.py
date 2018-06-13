@@ -89,14 +89,14 @@ def device_setup(conf=None):
     event_locks = list()
     for count, lock in enumerate(zwave_locks):
         lock_event = zw.listen_for_events(lock)
-        if lock_event != None:
+        if lock_event.lock_status != None:
             print("****ZWave Lock #{}***************************".format(count+1))
             print("        NODE: {}".format(lock.node_id))
             print("MANUFACTURER: \'{}\'".format(lock.manufacturer_name))
             print("PRODUCT NAME: \'{}\'".format(lock.product_name))
             print("********************************************\n")
             event_locks.append((count+1, lock_event))
-        elif lock_event == None:
+        elif lock_event.lock_status == None:
             print("****ZWave Lock #{}*DEAD**********************".format(count+1))
             print("        NODE: {}".format(lock.node_id))
             print("MANUFACTURER: \'{}\'".format(lock.manufacturer_name))
