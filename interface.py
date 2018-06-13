@@ -66,7 +66,7 @@ def device_setup(conf=None):
     if conf == None:
         zw = zwave.service()
     else:
-        zw = zwave.service(device=conf['device_path'])
+        zw = zwave.service(device=conf['device_path'], config_path=conf['config_path'])
     zw.start()
     for x in range(default_timeout):
         if zw.get_ready():
